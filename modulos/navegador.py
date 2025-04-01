@@ -9,7 +9,7 @@ import time
 
 class Navegador:
     def __init__(self):
-        self.driver = webdriver.Chrome()
+        self.driver = webdriver.Firefox()
 
     # Método para fazer login no GServ Web
     def loginGserv(self, valores_login):
