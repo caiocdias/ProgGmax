@@ -224,8 +224,16 @@ class Navegador:
         if dat_recebimento != "01/01/1900":
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'DatePicker1_dateInput')),
                                                  "Box da data de recebimento não foi encontrado a tempo.")
+
             self.driver.find_element(By.ID, "DatePicker1_dateInput").click()
-            self.driver.find_element(By.ID, "DatePicker1_dateInput").send_keys(dat_recebimento)
+
+            input_date = self.driver.find_element(By.ID, "DatePicker1_dateInput")
+            input_date.clear()
+            for char in str(dat_recebimento):
+                input_date.send_keys(char)
+            input_date.send_keys(Keys.TAB)
+
+
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label32')),
                                                  "Label de data de recebimento não foi encontrado a tempo.")
             self.driver.find_element(By.ID, 'Label32').click()
@@ -239,7 +247,11 @@ class Navegador:
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')),
                                                  "Box da data de recebimento não foi encontrado a tempo.")
             self.driver.find_element(By.ID, "RadTextBox9").click()
-            self.driver.find_element(By.ID, "RadTextBox9").send_keys(Keys.CONTROL, "A")
+
+            element = self.driver.find_element(By.ID, "RadTextBox9")
+            actions = ActionChains(self.driver)
+            actions.double_click(element).perform()
+
             time.sleep(1)
             self.driver.find_element(By.ID, "RadTextBox9").send_keys(prazo)
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label34')),
