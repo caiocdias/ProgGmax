@@ -359,8 +359,9 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Button11')))
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(1)
+        """
         WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
+            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))"""
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
