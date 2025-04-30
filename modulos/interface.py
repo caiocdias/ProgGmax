@@ -4,9 +4,9 @@ class Interface:
     # Interface de Login
     def tela_login(self):
         layout = [[sg.Text(s=(15, 0), text="Login", text_color="#000000", background_color="#ffffff"),
-                   sg.Input(s=(40, 0), key='matricula', default_text="A000001")],
+                   sg.Input(s=(40, 0), key='matricula', default_text="A000004")],
                   [sg.Text(s=(15, 0), text="Senha", text_color="#000000", background_color="#ffffff"),
-                   sg.Input(s=(40, 0), key='senha', password_char='*', default_text="BeLlG2F90DJy")],
+                   sg.Input(s=(40, 0), key='senha', password_char='*', default_text="sgi14269")],
                   [sg.Text(s=(15, 0), text="Link", text_color="#000000", background_color="#ffffff"),
                    sg.Input(s=(40, 0), key='link', default_text="https://gmaxweb.ddns.net:8443")],
                   [sg.Button('Ok'), sg.Button('Sair')]]

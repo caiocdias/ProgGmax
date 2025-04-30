@@ -17,6 +17,7 @@ class Navegador:
             self.driver.get(url=str(valores_login['link']))
             self.driver.maximize_window()
             time.sleep(1)
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'txtUser')))
             self.driver.find_element(By.ID, "txtUser").send_keys(valores_login['matricula'])
             self.driver.find_element(By.ID, "txtSenha").send_keys(valores_login['senha'])
             time.sleep(1)
@@ -114,6 +115,8 @@ class Navegador:
         # Box cliente
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox8')),
                                              "Box de nome do cliente não foi encontrado a tempo.")
+        if (len(nom_cliente) < 5):
+            nom_cliente = nom_cliente + " ####"
         self.driver.find_element(By.ID, "RadTextBox8").send_keys(nom_cliente)
 
         # Box serv_exp
@@ -216,6 +219,8 @@ class Navegador:
             time.sleep(1)
 
         # Box med_sap
+        self.driver.find_element(By.ID, "Label31").click()
+        time.sleep(1)
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox8')),
                                              "Box de número da medida não foi encontrado a tempo.")
         self.driver.find_element(By.ID, "RadTextBox8").send_keys(num_med)
@@ -227,12 +232,14 @@ class Navegador:
 
             self.driver.find_element(By.ID, "DatePicker1_dateInput").click()
 
-            input_date = self.driver.find_element(By.ID, "DatePicker1_dateInput")
-            input_date.clear()
+            """input_date = self.driver.find_element(By.ID, "DatePicker1_dateInput")
+            #input_date.clear()
+            input_date.send_keys(Keys.CONTROL, "A")
             for char in str(dat_recebimento):
                 input_date.send_keys(char)
+                time.sleep(0.1)
             input_date.send_keys(Keys.TAB)
-
+            time.sleep(1)"""
 
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label32')),
                                                  "Label de data de recebimento não foi encontrado a tempo.")
@@ -316,7 +323,11 @@ class Navegador:
         time.sleep(1)
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbHovered')))
         self.driver.find_element(By.CLASS_NAME, "rcbHovered").click()
+        time.sleep(0.5)
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label42')))
+        self.driver.find_element(By.ID, "Label42").click()
 
+        time.sleep(0.5)
         # Aguardando preencher tprev
         while self.driver.find_element(By.ID, "DatePicker6_dateInput").get_attribute("value") == "":
             time.sleep(1)
