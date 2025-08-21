@@ -5,7 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver import ActionChains
 import time
-
+from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException
 
 class Navegador:
     def __init__(self):
@@ -74,25 +74,34 @@ class Navegador:
             return 0  # Serviço não existe
 
     def buscarAcao(self, serv_index=int, acao=str):
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
-                                                                         '/html/body/form/div[3]/div/div[2]/div[3]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span'.format(
-                                                                             serv_index))),
-                                             f"Erro ao buscar acao, serviço {serv_index} nao encontrado")
-        self.driver.execute_script("arguments[0].scrollIntoView();", self.driver.find_element(By.XPATH,
-                                                                                              "/html/body/form/div[3]/div/div[2]/div[3]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span".format(
-                                                                                                  serv_index)))
-        time.sleep(1)
-        self.driver.find_element(By.XPATH,
-                                 "/html/body/form/div[3]/div/div[2]/div[3]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span".format(
-                                     serv_index)).click()
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')),
-            "___Form1_AjaxLoadingMainAjaxPanel, timeout de carregamento.")
+        wait = WebDriverWait(self.driver, 30)
+        overlay = (By.ID, '___Form1_AjaxLoadingMainAjaxPanel')
+
+        # 1) garanta que não há overlay antes de interagir
+        wait.until(EC.invisibility_of_element_located(overlay))
+
+        # 2) use o <td> como alvo principal (mais confiável que o <span>)
+        td_locator = (By.XPATH,
+                      f"/html/body/form/div[3]/div/div[2]/div[2]/div/div[2]/div[1]/table/tbody/tr[{serv_index}]/td[4]")
+
+        # 3) traga para a viewport no centro, depois espere ficar clicável
+        td_el = wait.until(EC.presence_of_element_located(td_locator))
+        self.driver.execute_script("arguments[0].scrollIntoView({block:'center', inline:'nearest'});", td_el)
+        td_el = wait.until(EC.element_to_be_clickable(td_locator))
+
+        # 4) clique com fallback para JS (evita interceptação)
+        try:
+            td_el.click()
+        except (ElementClickInterceptedException, StaleElementReferenceException):
+            self.driver.execute_script("arguments[0].click();", td_el)
+
+        # 5) agora sim espere o overlay sumir por causa do carregamento pós-clique
+        wait.until(EC.invisibility_of_element_located(overlay))
         try:
             i = 1
             while True:
                 texto_acao = self.driver.find_element(By.XPATH,
-                                                      "/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[3]".format(
+                                                      "/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[3]".format(
                                                           i)).text
                 texto_acao = texto_acao[0:3]
 
@@ -379,14 +388,14 @@ class Navegador:
 
     def trocarRespAcao(self, acao_index=int, matricula_resp=str):
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
-                                                                         '/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input'.format(
+                                                                         '/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input'.format(
                                                                              acao_index))))
         self.driver.execute_script("arguments[0].scrollIntoView();", self.driver.find_element(By.XPATH,
-                                                                                              "/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input".format(
+                                                                                              "/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input".format(
                                                                                                   acao_index)))
         time.sleep(1)
         self.driver.find_element(By.XPATH,
-                                 "/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input".format(
+                                 "/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{}]/td[1]/input".format(
                                      acao_index)).click()
         WebDriverWait(self.driver, 10).until(EC.frame_to_be_available_and_switch_to_it(
             (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')))
@@ -402,8 +411,8 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Button11')))
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(1)
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
+        """WebDriverWait(self.driver, 30).until(
+            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))"""
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
