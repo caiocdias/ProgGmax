@@ -11,6 +11,108 @@ class Navegador:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
+    def _set_masked_date(self, input_id: str, date_str: str, blur_locator=None, timeout=10, tries=2):
+        """
+        Preenche campos de data com máscara (Telerik RadDatePicker/RadDateInput) de forma robusta.
+        1) Tenta usar a API JS do Telerik ($find(...).set_selectedDate / set_value).
+        2) Se não houver, faz fallback para digitação controlada (CONTROL+A, DELETE, digitação char a char).
+        3) Dispara 'change'/'blur' e valida o valor final; reitera se necessário.
+        """
+        wait = WebDriverWait(self.driver, timeout)
+        el = wait.until(EC.element_to_be_clickable((By.ID, input_id)))
+        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+
+        js = r"""
+            (function(inputId, value){
+                function dispatchAll(elem){
+                    try {
+                        elem.dispatchEvent(new Event('input', {bubbles:true}));
+                        elem.dispatchEvent(new Event('change', {bubbles:true}));
+                        elem.dispatchEvent(new Event('blur', {bubbles:true}));
+                    } catch(e) {}
+                }
+
+                var el = document.getElementById(inputId);
+                if (!el) return null;
+
+                // Tenta Telerik: pegar o RadDatePicker e/ou RadDateInput
+                try {
+                    if (window.$find) {
+                        var pickerId = inputId.replace('_dateInput', '');
+                        var picker = $find(pickerId);
+                        if (picker && picker.set_selectedDate) {
+                            // value dd/MM/yyyy
+                            var p = value.split('/');
+                            var d = new Date(parseInt(p[2],10), parseInt(p[1],10)-1, parseInt(p[0],10));
+                            picker.set_selectedDate(d);
+                            var di = picker.get_dateInput && picker.get_dateInput();
+                            if (di && di.set_value) {
+                                di.set_value(value);
+                                // alguns skins exigem raise_change
+                                if (di.raise_change) di.raise_change();
+                            } else {
+                                el.value = value;
+                                dispatchAll(el);
+                            }
+                            return el.value;
+                        }
+                        // Ou RadDateInput diretamente
+                        var ri = $find(inputId);
+                        if (ri && ri.set_value) {
+                            ri.set_value(value);
+                            if (ri.raise_change) ri.raise_change();
+                            return el.value;
+                        }
+                    }
+                } catch(e) {}
+
+                // Fallback: setar direto + eventos
+                el.value = value;
+                dispatchAll(el);
+                return el.value;
+            })(arguments[0], arguments[1]);
+        """
+
+        for _ in range(tries):
+            # 1) tenta via JS/Telerik
+            got = self.driver.execute_script(js, input_id, date_str)
+            time.sleep(0.2)
+
+            # blur opcional (p.ex. clicar num label que valida o campo)
+            if blur_locator:
+                try:
+                    self.driver.find_element(*blur_locator).click()
+                except Exception:
+                    pass
+
+            val = self.driver.find_element(By.ID, input_id).get_attribute("value") or ""
+            if val.strip() == date_str:
+                return
+
+            # 2) fallback: digitação controlada
+            el = self.driver.find_element(By.ID, input_id)
+            el.click()
+            el.send_keys(Keys.CONTROL, 'a')
+            el.send_keys(Keys.DELETE)
+            time.sleep(0.1)
+            for ch in date_str:
+                el.send_keys(ch)
+                time.sleep(0.05)  # dá tempo para a máscara
+            el.send_keys(Keys.TAB)
+            time.sleep(0.2)
+
+            if blur_locator:
+                try:
+                    self.driver.find_element(*blur_locator).click()
+                except Exception:
+                    pass
+
+            val = self.driver.find_element(By.ID, input_id).get_attribute("value") or ""
+            if val.strip() == date_str:
+                return
+
+        raise RuntimeError(f"Falha ao setar data em {input_id}: obtive '{val}' (esperado '{date_str}')")
+
     # Método para fazer login no GServ Web
     def loginGserv(self, valores_login):
         try:
@@ -157,9 +259,7 @@ class Navegador:
 
         # Box dat_compromisso
         if dat_compromisso != "01/01/1900":
-            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, "DatePicker1_dateInput")),
-                                                 "Box da data de compromisso não foi encontrado a tempo.")
-            self.driver.find_element(By.ID, "DatePicker1_dateInput").send_keys(dat_compromisso)
+            self._set_masked_date("DatePicker1_dateInput", dat_compromisso)
 
         # Box telefone
         if telefone != "":
@@ -236,19 +336,9 @@ class Navegador:
 
         # Box dat_recebimento
         if dat_recebimento != "01/01/1900":
-            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'DatePicker1_dateInput')),
-                                                 "Box da data de recebimento não foi encontrado a tempo.")
-
-            self.driver.find_element(By.ID, "DatePicker1_dateInput").click()
-
-            """input_date = self.driver.find_element(By.ID, "DatePicker1_dateInput")
-            #input_date.clear()
-            input_date.send_keys(Keys.CONTROL, "A")
-            for char in str(dat_recebimento):
-                input_date.send_keys(char)
-                time.sleep(0.1)
-            input_date.send_keys(Keys.TAB)
-            time.sleep(1)"""
+            self._set_masked_date("DatePicker1_dateInput", dat_recebimento, blur_locator=(By.ID, 'Label32'))
+            WebDriverWait(self.driver, 30).until(
+                EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
 
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label32')),
                                                  "Label de data de recebimento não foi encontrado a tempo.")
@@ -293,10 +383,6 @@ class Navegador:
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(3)
         self.driver.switch_to.default_content()
-        """"
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
-        self.driver.switch_to.default_content()"""
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
 
@@ -352,17 +438,8 @@ class Navegador:
 
         # Se necessario, concluir a ação e selecionar a proxima
         if dat_conclusao != "":
-            input_date = self.driver.find_element(By.ID, "DatePicker7_dateInput")
-            input_date.clear()
-            for char in str(dat_conclusao):
-                input_date.send_keys(char)
-            input_date.send_keys(Keys.TAB)
-
-            input_date2 = self.driver.find_element(By.ID, "DatePicker8_dateInput")
-            input_date2.clear()
-            for char in str(dat_conclusao):
-                input_date2.send_keys(char)
-            input_date2.send_keys(Keys.TAB)
+            self._set_masked_date("DatePicker7_dateInput", dat_conclusao)
+            self._set_masked_date("DatePicker8_dateInput", dat_conclusao)
 
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox19')))
             self.driver.find_element(By.ID, "RadTextBox19").send_keys("1000")
@@ -379,9 +456,6 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Button11')))
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(1)
-        """
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))"""
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
@@ -411,8 +485,6 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Button11')))
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(1)
-        """WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))"""
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
@@ -456,9 +528,6 @@ class Navegador:
             EC.element_to_be_clickable((By.XPATH, '/html/body/form/div[3]/div/div[1]/div/div/div/div[4]/button')))
         self.driver.find_element(By.XPATH, "/html/body/form/div[3]/div/div[1]/div/div/div/div[4]/button").click()
         time.sleep(1)
-        """
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))"""
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
