@@ -25,9 +25,7 @@ class Interface:
 
     def selecionar_Tipo(self):
         layout = [
-            [sg.Button('Programar Serviços'), sg.Button('Programar Ações'), sg.Button('Trocar Responsável pela Ação'),
-             sg.Button('Trocar Data de Recebimento'), sg.Button("Concluir Ações"),
-             sg.Button('Alterar Observação'), sg.Button('Sair')]]
+            [sg.Button('Programar Serviços'), sg.Button('Programar Ações'), sg.Button('Trocar Responsável pela Ação'), sg.Button("Concluir Ações"), sg.Button('Sair')]]
 
         win = sg.Window('Tela de Seleção', layout=layout, background_color="#ffffff",
                         button_color=("#ffffff", "#000000"))

@@ -11,6 +11,38 @@ class Navegador:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
+    def _telerik_set_value(self, client_id: str, valor: str):
+        self.driver.execute_script("""
+            var id = arguments[0], val = arguments[1];
+            // normaliza: "1.234,56" -> "1234.56" (número JS)
+            function brToNumber(s){
+                if (typeof s !== 'string') return s;
+                s = s.trim();
+                if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) s = s.replace(/\./g,''); // remove milhar
+                if (s.indexOf(',') >= 0) s = s.replace(',', '.'); // vírgula -> ponto
+                var n = parseFloat(s);
+                return isNaN(n) ? null : n;
+            }
+            var ctl = (window.$find ? $find(id) : null);
+            if (ctl && typeof ctl.set_value === 'function') {
+                var n = brToNumber(val);
+                // RadNumericTextBox quer número; RadMaskedTextBox aceita string,
+                // mas set_value com número também funciona para máscara numérica.
+                ctl.set_value(n !== null ? n : val);
+                if (ctl.updateDisplayValue) ctl.updateDisplayValue();
+                if (ctl.raise_valueChanged) ctl.raise_valueChanged();
+                if (ctl._input && ctl._input.blur) ctl._input.blur();
+            } else {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.value = val;
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    el.blur();
+                }
+            }
+        """, client_id, valor)
+
     def _set_masked_date(self, input_id: str, date_str: str, blur_locator=None, timeout=10, tries=2):
         """
         Preenche campos de data com máscara (Telerik RadDatePicker/RadDateInput) de forma robusta.
@@ -536,12 +568,11 @@ class Navegador:
     def concluir_acao(self, acao_index, matricula_resp, dat_ini, dat_conc, us_prj, us_top, us_geo, us_int, prox_acao,
                       obs):
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
-                                                                         f"/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input")))
+                                                                         f"/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input")))
         self.driver.execute_script("arguments[0].scrollIntoView();", self.driver.find_element(By.XPATH,
-                                                                                              f"/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input"))
+                                                                                              f"/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input"))
         time.sleep(1)
-        self.driver.find_element(By.XPATH,
-                                 f"/html/body/form/div[3]/div/div[2]/div[4]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input").click()
+        self.driver.find_element(By.XPATH,f"/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[2]/div[1]/table/tbody/tr[{acao_index}]/td[1]/input").click()
         time.sleep(1)
         WebDriverWait(self.driver, 10).until(EC.frame_to_be_available_and_switch_to_it(
             (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')))
@@ -560,16 +591,12 @@ class Navegador:
         # Box data de inicio
         if dat_ini != "":
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'DatePicker7_dateInput')))
-            self.driver.find_element(By.ID, 'DatePicker7_dateInput').send_keys(Keys.CONTROL, 'A')
-            time.sleep(0.5)
-            self.driver.find_element(By.ID, 'DatePicker7_dateInput').send_keys(dat_ini)
+            self._set_masked_date("DatePicker7_dateInput", dat_ini, blur_locator=(By.ID, 'Label42'))
 
         # Box data de conclusao
         if dat_conc != "":
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'DatePicker8_dateInput')))
-            self.driver.find_element(By.ID, 'DatePicker8_dateInput').send_keys(Keys.CONTROL, 'A')
-            time.sleep(0.5)
-            self.driver.find_element(By.ID, 'DatePicker8_dateInput').send_keys(dat_conc)
+            self._set_masked_date("DatePicker8_dateInput", dat_conc, blur_locator=(By.ID, 'Label32'))
 
         # Box %exec
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox19')))
@@ -580,26 +607,22 @@ class Navegador:
         # Box US_PRJ
         if us_prj != '':
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox1')))
-            self.driver.find_element(By.ID, 'RadTextBox1').send_keys(Keys.CONTROL, 'A')
-            self.driver.find_element(By.ID, 'RadTextBox1').send_keys(us_prj)
+            self._telerik_set_value('RadTextBox1', us_prj)
 
         # Box US_TOP
         if us_top != '':
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox2')))
-            self.driver.find_element(By.ID, 'RadTextBox2').send_keys(Keys.CONTROL, 'A')
-            self.driver.find_element(By.ID, 'RadTextBox2').send_keys(us_top)
+            self._telerik_set_value('RadTextBox2', us_top)
 
         # Box US_GEO
         if us_geo != '':
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox3')))
-            self.driver.find_element(By.ID, 'RadTextBox3').send_keys(Keys.CONTROL, 'A')
-            self.driver.find_element(By.ID, 'RadTextBox3').send_keys(us_geo)
+            self._telerik_set_value('RadTextBox3', us_geo)
 
         # Box US_INT
         if us_int != '':
             WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox4')))
-            self.driver.find_element(By.ID, 'RadTextBox4').send_keys(Keys.CONTROL, 'A')
-            self.driver.find_element(By.ID, 'RadTextBox4').send_keys(us_int)
+            self._telerik_set_value('RadTextBox4', us_int)
 
         # Box proxacao
         if prox_acao != '':
@@ -621,8 +644,6 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Button11')))
         self.driver.find_element(By.ID, "Button11").click()
         time.sleep(1)
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
         self.driver.switch_to.default_content()
         WebDriverWait(self.driver, 30).until(
             EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
