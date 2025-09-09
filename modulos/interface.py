@@ -8,7 +8,7 @@ class Interface:
                   [sg.Text(s=(15, 0), text="Senha", text_color="#000000", background_color="#ffffff"),
                    sg.Input(s=(40, 0), key='senha', password_char='*', default_text="ifkrzUhQ7sM8yQ!31")],
                   [sg.Text(s=(15, 0), text="Link", text_color="#000000", background_color="#ffffff"),
-                   sg.Input(s=(40, 0), key='link', default_text="https://gmaxwebbh.ddns.net:8443")],
+                   sg.Input(s=(40, 0), key='link', default_text="https://gmaxwebbh.ddns.net:8443/GMax/Pages/PageLogin.aspx?&url=L0dNYXgvUGFnZXMvUGFnZUdNYXhXZWIuYXNweA==")],
                   [sg.Button('Ok'), sg.Button('Sair')]]
 
         win = sg.Window('Tela de Login', layout=layout, background_color="#ffffff", button_color=("#ffffff", "#000000"))
