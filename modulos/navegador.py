@@ -11,6 +11,13 @@ class Navegador:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
+    def _switch_to_serv_iframe(self):
+        WebDriverWait(self.driver, 10).until(
+            EC.frame_to_be_available_and_switch_to_it(
+                (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
+            )
+        )
+
     def _wait_global_ajax_idle(self, timeout=30):
         wait = WebDriverWait(self.driver, timeout)
         overlay = (By.ID, '___Form1_AjaxLoadingMainAjaxPanel')
@@ -339,7 +346,7 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.frame_to_be_available_and_switch_to_it(
             (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')), "Iframe não carregou a tempo.")
         WebDriverWait(self.driver, 10).until(
-            EC.invisibility_of_element_located((By.CLASS_NAME, 'rwWindowContent rwExternalContent rwLoading')),
+            EC.invisibility_of_element_located((By.CSS_SELECTOR, '.rwWindowContent.rwExternalContent.rwLoading')),
             "Timeout de carregamento interno do serviço.")
 
         # Box contrato
@@ -353,18 +360,22 @@ class Navegador:
         time.sleep(1)
 
         # Box cod_serv
-        time.sleep(1)
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'ComboBox2_Input')),
-                                             "Box do código de serviço não foi encontrado a tempo.")
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'ComboBox2_Input')))
         self.driver.find_element(By.ID, "ComboBox2_Input").send_keys(cod_servico)
         time.sleep(1)
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbItem')),
-                                             "Dropdown de serviço selecionado não foi encontrado a tempo.")
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbItem')))
         self.driver.find_element(By.CLASS_NAME, "rcbItem").click()
 
-        # Aguardando prazo preencher
-        while self.driver.find_element(By.ID, "RadTextBox9").get_attribute("value") == "":
-            time.sleep(1)
+        # Aguarde o postback no documento raiz
+        self._wait_global_ajax_idle()
+
+        # Reentre no iframe da janela do serviço
+        self._switch_to_serv_iframe()
+
+        # Agora sim aguarde o campo "prazo" ser populado pelo servidor
+        WebDriverWait(self.driver, 20).until(
+            lambda d: (d.find_element(By.ID, "RadTextBox9").get_attribute("value") or "").strip() != ""
+        )
 
         # Box med_sap
         self.driver.find_element(By.ID, "Label31").click()
@@ -388,22 +399,16 @@ class Navegador:
                 )
             )
 
-        # Box prazo
+        # Box prazo (opcionalmente sobrescrever)
         if prazo != "":
-            # 1) garanta que não há overlay AGORA
+            # garanta que nada esteja carregando antes de editar
             self._wait_global_ajax_idle()
+            self._switch_to_serv_iframe()
 
-            # 2) reentra no iframe da janela de serviço
-            WebDriverWait(self.driver, 10).until(
-                EC.frame_to_be_available_and_switch_to_it(
-                    (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
-                )
-            )
-
-            # 3) tente setar via Telerik (evita clique/foco)
+            # tente via API do Telerik primeiro (mais confiável)
             try:
                 self._telerik_set_value('RadTextBox9', prazo)
-                # commit sem clicar em label
+                # "commit" de eventos
                 self.driver.execute_script("""
                     var el = document.getElementById('RadTextBox9');
                     if (el) {
@@ -413,25 +418,17 @@ class Navegador:
                     }
                 """)
             except Exception:
-                # fallback: clique/edição controlada, com espera + JS click se precisar
                 tb = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')))
                 self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", tb)
                 try:
                     tb.click()
                 except (ElementClickInterceptedException, StaleElementReferenceException):
-                    # overlay de novo? espere e tente JS click
                     self._wait_global_ajax_idle()
-                    WebDriverWait(self.driver, 10).until(
-                        EC.frame_to_be_available_and_switch_to_it(
-                            (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
-                        )
-                    )
+                    self._switch_to_serv_iframe()
                     self.driver.execute_script("arguments[0].click();", tb)
-
                 tb.send_keys(Keys.CONTROL, 'a')
                 tb.send_keys(Keys.DELETE)
                 tb.send_keys(prazo)
-                # commit por eventos
                 self.driver.execute_script("""
                     var el = document.getElementById('RadTextBox9');
                     if (el) {
@@ -441,14 +438,12 @@ class Navegador:
                     }
                 """)
 
-            # 4) espere o Ajax pós-alteração concluir antes de seguir
+            # espere qualquer AJAX que a mudança de prazo dispare e valide o valor final
             self._wait_global_ajax_idle()
-            time.sleep(1)
-            # 5) se o fluxo seguinte ainda precisar do iframe:
+            self._switch_to_serv_iframe()
             WebDriverWait(self.driver, 10).until(
-                EC.frame_to_be_available_and_switch_to_it(
-                    (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
-                )
+                lambda d: (d.find_element(By.ID, "RadTextBox9").get_attribute("value") or "").strip() == str(
+                    prazo).strip()
             )
 
         # Box base
