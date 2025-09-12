@@ -390,23 +390,66 @@ class Navegador:
 
         # Box prazo
         if prazo != "":
-            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')),
-                                                 "Box da data de recebimento não foi encontrado a tempo.")
-            self.driver.find_element(By.ID, "RadTextBox9").click()
+            # 1) garanta que não há overlay AGORA
+            self._wait_global_ajax_idle()
 
-            element = self.driver.find_element(By.ID, "RadTextBox9")
-            actions = ActionChains(self.driver)
-            actions.double_click(element).perform()
+            # 2) reentra no iframe da janela de serviço
+            WebDriverWait(self.driver, 10).until(
+                EC.frame_to_be_available_and_switch_to_it(
+                    (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
+                )
+            )
 
-            time.sleep(1)
-            self.driver.find_element(By.ID, "RadTextBox9").send_keys(prazo)
-            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label34')),
-                                                 "Label de data de recebimento não foi encontrado a tempo.")
-            self.driver.find_element(By.ID, 'Label34').click()
-            time.sleep(1)
-            WebDriverWait(self.driver, 30).until(
-                EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')),
-                "___Form1_AjaxLoadingMainAjaxPanel, timeout de carregamento.")
+            # 3) tente setar via Telerik (evita clique/foco)
+            try:
+                self._telerik_set_value('RadTextBox9', prazo)
+                # commit sem clicar em label
+                self.driver.execute_script("""
+                    var el = document.getElementById('RadTextBox9');
+                    if (el) {
+                        el.dispatchEvent(new Event('input',{bubbles:true}));
+                        el.dispatchEvent(new Event('change',{bubbles:true}));
+                        el.blur();
+                    }
+                """)
+            except Exception:
+                # fallback: clique/edição controlada, com espera + JS click se precisar
+                tb = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')))
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", tb)
+                try:
+                    tb.click()
+                except (ElementClickInterceptedException, StaleElementReferenceException):
+                    # overlay de novo? espere e tente JS click
+                    self._wait_global_ajax_idle()
+                    WebDriverWait(self.driver, 10).until(
+                        EC.frame_to_be_available_and_switch_to_it(
+                            (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
+                        )
+                    )
+                    self.driver.execute_script("arguments[0].click();", tb)
+
+                tb.send_keys(Keys.CONTROL, 'a')
+                tb.send_keys(Keys.DELETE)
+                tb.send_keys(prazo)
+                # commit por eventos
+                self.driver.execute_script("""
+                    var el = document.getElementById('RadTextBox9');
+                    if (el) {
+                        el.dispatchEvent(new Event('input',{bubbles:true}));
+                        el.dispatchEvent(new Event('change',{bubbles:true}));
+                        el.blur();
+                    }
+                """)
+
+            # 4) espere o Ajax pós-alteração concluir antes de seguir
+            self._wait_global_ajax_idle()
+
+            # 5) se o fluxo seguinte ainda precisar do iframe:
+            WebDriverWait(self.driver, 10).until(
+                EC.frame_to_be_available_and_switch_to_it(
+                    (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
+                )
+            )
 
         # Box base
         time.sleep(1)
