@@ -11,13 +11,6 @@ class Navegador:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
-    def _switch_to_serv_iframe(self):
-        WebDriverWait(self.driver, 10).until(
-            EC.frame_to_be_available_and_switch_to_it(
-                (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
-            )
-        )
-
     def _wait_global_ajax_idle(self, timeout=30):
         wait = WebDriverWait(self.driver, timeout)
         overlay = (By.ID, '___Form1_AjaxLoadingMainAjaxPanel')
@@ -346,7 +339,7 @@ class Navegador:
         WebDriverWait(self.driver, 10).until(EC.frame_to_be_available_and_switch_to_it(
             (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')), "Iframe não carregou a tempo.")
         WebDriverWait(self.driver, 10).until(
-            EC.invisibility_of_element_located((By.CSS_SELECTOR, '.rwWindowContent.rwExternalContent.rwLoading')),
+            EC.invisibility_of_element_located((By.CLASS_NAME, 'rwWindowContent rwExternalContent rwLoading')),
             "Timeout de carregamento interno do serviço.")
 
         # Box contrato
@@ -360,22 +353,18 @@ class Navegador:
         time.sleep(1)
 
         # Box cod_serv
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'ComboBox2_Input')))
+        time.sleep(1)
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'ComboBox2_Input')),
+                                             "Box do código de serviço não foi encontrado a tempo.")
         self.driver.find_element(By.ID, "ComboBox2_Input").send_keys(cod_servico)
         time.sleep(1)
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbItem')))
+        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbItem')),
+                                             "Dropdown de serviço selecionado não foi encontrado a tempo.")
         self.driver.find_element(By.CLASS_NAME, "rcbItem").click()
 
-        # Aguarde o postback no documento raiz
-        self._wait_global_ajax_idle()
-
-        # Reentre no iframe da janela do serviço
-        self._switch_to_serv_iframe()
-
-        # Agora sim aguarde o campo "prazo" ser populado pelo servidor
-        WebDriverWait(self.driver, 20).until(
-            lambda d: (d.find_element(By.ID, "RadTextBox9").get_attribute("value") or "").strip() != ""
-        )
+        # Aguardando prazo preencher
+        while self.driver.find_element(By.ID, "RadTextBox9").get_attribute("value") == "":
+            time.sleep(1)
 
         # Box med_sap
         self.driver.find_element(By.ID, "Label31").click()
@@ -399,52 +388,26 @@ class Navegador:
                 )
             )
 
-        # Box prazo (opcionalmente sobrescrever)
+        # Box prazo
         if prazo != "":
-            # garanta que nada esteja carregando antes de editar
-            self._wait_global_ajax_idle()
-            self._switch_to_serv_iframe()
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')),
+                                                 "Box da data de recebimento não foi encontrado a tempo.")
+            time.sleep(1)
+            self.driver.find_element(By.ID, "RadTextBox9").click()
 
-            # tente via API do Telerik primeiro (mais confiável)
-            try:
-                self._telerik_set_value('RadTextBox9', prazo)
-                # "commit" de eventos
-                self.driver.execute_script("""
-                    var el = document.getElementById('RadTextBox9');
-                    if (el) {
-                        el.dispatchEvent(new Event('input',{bubbles:true}));
-                        el.dispatchEvent(new Event('change',{bubbles:true}));
-                        el.blur();
-                    }
-                """)
-            except Exception:
-                tb = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'RadTextBox9')))
-                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", tb)
-                try:
-                    tb.click()
-                except (ElementClickInterceptedException, StaleElementReferenceException):
-                    self._wait_global_ajax_idle()
-                    self._switch_to_serv_iframe()
-                    self.driver.execute_script("arguments[0].click();", tb)
-                tb.send_keys(Keys.CONTROL, 'a')
-                tb.send_keys(Keys.DELETE)
-                tb.send_keys(prazo)
-                self.driver.execute_script("""
-                    var el = document.getElementById('RadTextBox9');
-                    if (el) {
-                        el.dispatchEvent(new Event('input',{bubbles:true}));
-                        el.dispatchEvent(new Event('change',{bubbles:true}));
-                        el.blur();
-                    }
-                """)
+            element = self.driver.find_element(By.ID, "RadTextBox9")
+            actions = ActionChains(self.driver)
+            actions.double_click(element).perform()
 
-            # espere qualquer AJAX que a mudança de prazo dispare e valide o valor final
-            self._wait_global_ajax_idle()
-            self._switch_to_serv_iframe()
-            WebDriverWait(self.driver, 10).until(
-                lambda d: (d.find_element(By.ID, "RadTextBox9").get_attribute("value") or "").strip() == str(
-                    prazo).strip()
-            )
+            time.sleep(1)
+            self.driver.find_element(By.ID, "RadTextBox9").send_keys(prazo)
+            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label34')),
+                                                 "Label de data de recebimento não foi encontrado a tempo.")
+            self.driver.find_element(By.ID, 'Label34').click()
+            time.sleep(1)
+            WebDriverWait(self.driver, 30).until(
+                EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')),
+                "___Form1_AjaxLoadingMainAjaxPanel, timeout de carregamento.")
 
         # Box base
         time.sleep(1)
