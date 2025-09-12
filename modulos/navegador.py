@@ -11,6 +11,13 @@ class Navegador:
     def __init__(self):
         self.driver = webdriver.Firefox()
 
+    def _wait_global_ajax_idle(self, timeout=30):
+        wait = WebDriverWait(self.driver, timeout)
+        overlay = (By.ID, '___Form1_AjaxLoadingMainAjaxPanel')
+        # espere no documento raiz
+        self.driver.switch_to.default_content()
+        wait.until(EC.invisibility_of_element_located(overlay))
+
     def _telerik_set_value(self, client_id: str, valor: str):
         self.driver.execute_script("""
             var id = arguments[0], val = arguments[1];
@@ -368,17 +375,18 @@ class Navegador:
 
         # Box dat_recebimento
         if dat_recebimento != "01/01/1900":
+            # já faz blur/click no label via blur_locator
             self._set_masked_date("DatePicker1_dateInput", dat_recebimento, blur_locator=(By.ID, 'Label32'))
-            WebDriverWait(self.driver, 30).until(
-                EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
 
-            WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'Label32')),
-                                                 "Label de data de recebimento não foi encontrado a tempo.")
-            self.driver.find_element(By.ID, 'Label32').click()
-            time.sleep(1)
-            WebDriverWait(self.driver, 30).until(
-                EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')),
-                "___Form1_AjaxLoadingMainAjaxPanel, timeout de carregamento.")
+            # ESPERE o overlay no documento raiz e só então volte para o iframe
+            self._wait_global_ajax_idle()
+
+            # reentra no iframe antes de continuar o fluxo
+            WebDriverWait(self.driver, 10).until(
+                EC.frame_to_be_available_and_switch_to_it(
+                    (By.XPATH, '/html/body/form/div[1]/table/tbody/tr[2]/td[2]/iframe')
+                )
+            )
 
         # Box prazo
         if prazo != "":
