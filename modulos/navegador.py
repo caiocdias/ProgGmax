@@ -413,7 +413,7 @@ class Navegador:
         time.sleep(1)
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, 'ComboBox3_Input')),
                                              "Box de base não foi encontrado a tempo.")
-        self.driver.find_element(By.ID, "ComboBox3_Input").send_keys(base)
+        self.driver.find_element(By.ID, "ComboBox3_Input").send_keys("DVL")
         time.sleep(1)
         WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'rcbHovered')),
                                              "Dropdown de base selecionada não foi encontrado a tempo.")
