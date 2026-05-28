@@ -429,19 +429,20 @@ class Navegador:
 
     def cadastrarAcoes(self, serv_index=int, cod_acao=str, matricula_resp=str, dat_conclusao=str, prox_acao=str,
                        obs=str):
-        WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.XPATH,
-                                                                         '/html/body/form/div[3]/div/div[2]/div[2]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span'.format(
-                                                                             serv_index))))
-        self.driver.execute_script("arguments[0].scrollIntoView({block: 'nearest'});",
-                                   self.driver.find_element(By.XPATH,
-                                                            "/html/body/form/div[3]/div/div[2]/div[2]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span".format(
-                                                                serv_index)))
-        time.sleep(1)
-        self.driver.find_element(By.XPATH,
-                                 "/html/body/form/div[3]/div/div[2]/div[2]/div/div[2]/div[1]/table/tbody/tr[{}]/td[4]/span".format(
-                                     serv_index)).click()
-        WebDriverWait(self.driver, 30).until(
-            EC.invisibility_of_element_located((By.ID, '___Form1_AjaxLoadingMainAjaxPanel')))
+        wait = WebDriverWait(self.driver, 30)
+        overlay = (By.ID, '___Form1_AjaxLoadingMainAjaxPanel')
+
+        wait.until(EC.invisibility_of_element_located(overlay))
+        td_locator = (By.XPATH,
+                      f"/html/body/form/div[3]/div/div[2]/div[2]/div/div[2]/div[1]/table/tbody/tr[{serv_index}]/td[4]")
+        td_el = wait.until(EC.presence_of_element_located(td_locator))
+        self.driver.execute_script("arguments[0].scrollIntoView({block:'center', inline:'nearest'});", td_el)
+        td_el = wait.until(EC.element_to_be_clickable(td_locator))
+        try:
+            td_el.click()
+        except (ElementClickInterceptedException, StaleElementReferenceException):
+            self.driver.execute_script("arguments[0].click();", td_el)
+        wait.until(EC.invisibility_of_element_located(overlay))
         self.driver.execute_script(
             "arguments[0].scrollIntoView({block: 'nearest', behavior: 'instant'});",
             self.driver.find_element(By.XPATH, "/html/body/form/div[3]/div/div[2]/div[3]/div[1]/div[1]/button")

@@ -6,6 +6,14 @@ import sys
 import selenium.common.exceptions as exc
 from PyQt5.QtWidgets import QApplication
 
+def normalizar_med_sap(valor):
+    if pd.isna(valor):
+        return ""
+    texto = str(valor).strip()
+    if texto.endswith(".0"):
+        texto = texto[:-2]
+    return texto
+
 janela = Interface()
 valores_login = None
 tipo_Janela = janela.selecionar_Tipo()
@@ -72,11 +80,12 @@ elif tipo_Janela == 2:
     window.show()
     app.exec_()
 
-    cadastro_acao = pd.read_csv("cadastro_acao.csv", sep=',')
+    cadastro_acao = pd.read_csv("cadastro_acao.csv", sep=',', dtype={'MED_SAP*': str})
     cadastro_acao['DAT_CONCLUSAO'] = cadastro_acao['DAT_CONCLUSAO'].replace(np.nan, "")
     cadastro_acao['PROXIMA_ACAO'] = cadastro_acao['PROXIMA_ACAO'].replace(np.nan, 0)
     cadastro_acao['PROXIMA_ACAO'] = np.array(cadastro_acao['PROXIMA_ACAO'], dtype=np.int64)
     cadastro_acao['SERV*'] = cadastro_acao['SERV*'].apply(lambda x: '{0:0>4}'.format(x))
+    cadastro_acao['MED_SAP*'] = cadastro_acao['MED_SAP*'].apply(normalizar_med_sap)
     cadastro_acao['COD_ACAO*'] = cadastro_acao['COD_ACAO*'].apply(lambda x: '{0:0>3}'.format(x))
     cadastro_acao['PROXIMA_ACAO'] = cadastro_acao['PROXIMA_ACAO'].apply(lambda x: '{0:0>3}'.format(x))
     cadastro_acao['MATRICULA_RESP'] = cadastro_acao['MATRICULA_RESP'].replace(np.nan, "")
